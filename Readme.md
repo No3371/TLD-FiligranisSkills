@@ -1,4 +1,4 @@
-# Filigrani's Skill
+# Filigrani's Skills
 
 This is a custom skill API for the game The Long Dark.
 
