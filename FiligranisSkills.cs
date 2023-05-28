@@ -288,12 +288,12 @@ namespace FiligranisSkills
         public LocalizedString[] TiersDescriptionLocalized { get; set; }
 
 		/// <summary>
-		/// Benefit descriptions for each tier. Noted that the game expect every tier comes with 1 addtional benefits and each line to be separated with `\n` (linebreak), so tier 3 need to be benefit1\nbenefit2\nbenefit3. The length is required to be 5.
+		/// Benefit descriptions for each tier. Noted that benefits entries are separated with `\n` (linebreak), so 3 benefits need to be "benefit1\nbenefit2\nbenefit3". The length is required to be 5.
 		/// </summary>
         public LocalizedString[] TiersBenefitsLocalized { get; set; }
 
 		/// <summary>
-		/// The point threshold for each tier. Start with 0 because it's the level we start with. The length is required to be 5.
+		/// The point threshold for each tier. The length is required to be 5.
 		/// </summary>
         public int[] TierThresholds { get; set; }
 
