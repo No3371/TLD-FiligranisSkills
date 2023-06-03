@@ -139,7 +139,6 @@ namespace FiligranisSkills
 				// 	FiligranisSkills.Instance.Logger?.Msg($"CustomSkill {cs.Def.Name} {cs.Def.TierThresholds[0]}/{cs.Def.TierThresholds[1]}/{cs.Def.TierThresholds[2]}/{cs.Def.TierThresholds[3]}/{cs.Def.TierThresholds[4]}");
 				// }
 			}
-
 			if (__instance.m_SkillImageLarge.mainTexture == null)
 			{
                 SkillListItem skillListItem = __instance.m_SkillsDisplayList[__instance.m_SkillListSelectedIndex];
@@ -296,16 +295,6 @@ namespace FiligranisSkills
 		/// The point threshold for each tier. The length is required to be 5.
 		/// </summary>
         public int[] TierThresholds { get; set; }
-
-		/// <summary>
-		/// The texture of the skill icon. Supply texture loaded from your bundle. Not required when using TLD resource.
-		/// </summary>
-        public Texture2D? Icon { get; set; }
-
-		/// <summary>
-		/// The texture of the skill icon background. Supply texture loaded from your bundle. Not required when using TLD resource.
-		/// </summary>
-        public Texture2D? IconBackground { get; set; }
 
 		/// <summary>
 		/// The texture of the skill description background image. Supply texture loaded from your bundle. Not required when using TLD resource.
