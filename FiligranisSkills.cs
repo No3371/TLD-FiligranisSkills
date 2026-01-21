@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using HarmonyLib;
 using Il2Cpp;
+using Il2CppAK.Wwise;
 using Il2CppInterop.Runtime.Injection;
 using MelonLoader;
 using MelonLoader.TinyJSON;
@@ -23,7 +24,14 @@ namespace FiligranisSkills
 
         public override void OnInitializeMelon()
         {
-
+			uConsole.RegisterCommand("fskills_saved", new Action(() => {
+				for (int i = FiligranisSkills.customSkillOffset; i < GameManager.GetSkillsManager().m_Skills.Count; i++)
+				{
+					var skill = GameManager.GetSkillsManager().m_Skills[i];
+					var name = skill.name.Substring("Skill_".Length);
+					Instance.LoggerInstance?.Msg($"FSkill: {name} {Instance.ModSave.Load($"skillpoint_{name}")}");
+				}
+			}));
 			uConsole.RegisterCommand("fskills_add_point", new Action(() => {
 				var @params = uConsole.GetAllParameters();
 				if (@params == null) return;
@@ -65,7 +73,6 @@ namespace FiligranisSkills
         }
 
         internal ModDataManager ModSave { get; private set; } = new ModDataManager(nameof(FiligranisSkills));
-		internal MelonLogger.Instance? Logger { get; private set; }
 		internal static Dictionary<string, int> skills = new Dictionary<string, int>();
 		internal static List<SkillDefinition> defs = new List<SkillDefinition>();
 		internal static int customSkillOffset;
@@ -88,25 +95,23 @@ namespace FiligranisSkills
 		/// <param name="skillName"></param>
         public static void IncreaseSkillPoints(string skillName, int points)
         {
-            SkillsManager skillsManager = GameManager.GetSkillsManager();
-            var skill = skillsManager.m_Skills[customSkillOffset + skills[skillName]];
-			Instance.Logger?.Error($"IncreaseCustomSkillPoints: {skillName} ({skill.GetPoints()}p) (t{skill.GetCurrentTierNumber()}) + {points}... { skill.GetTierPoints(0) }/{ skill.GetTierPoints(1) }/{ skill.GetTierPoints(2) }/{ skill.GetTierPoints(3) }/{ skill.GetTierPoints(4) }");
-			Instance.Logger?.Error($"PreviousTier: {skill.GetCurrentTierNumber()}");
-			// // Set the tier points again because somehow the array's fucked up and points to somewher else every now and then
-			// for (int i = 0; i < skill.Def.TierThresholds.Length; i++) skill.m_TierPoints[i] = skill.Def.TierThresholds[i];
-            int PreviousTier = skill.GetCurrentTierNumber();
-            skill.IncrementPoints(points, SkillsManager.PointAssignmentMode.AssignOnlyInSandbox);
-            int CurrentTier = skill.GetCurrentTierNumber();
-			Instance.Logger?.Error($"CurrentTier: {skill.GetCurrentTierNumber()}");
-            if (PreviousTier != CurrentTier)
-            {
-                GameManager.GetSkillNotify().MaybeShowLevelUp(skill.m_SkillIcon, skill.m_DisplayName, skillsManager.GetTierName(CurrentTier), CurrentTier+1);
-            } else
-            {
-                GameManager.GetSkillNotify().MaybeShowPointIncrease(skill.m_SkillIcon);
-            }
-			Instance.Logger?.Error($"New tiers: {CurrentTier} points: {skill.GetPoints()} / {skill.GetTierPoints(CurrentTier)}");
-        }
+			SkillsManager skillsManager = GameManager.GetSkillsManager();
+			Skill skill = skillsManager.m_Skills[customSkillOffset + skills[skillName]];
+			int prevTier = skill.GetCurrentTierNumber();
+			int prevPoints = skill.GetPoints();
+			skill.IncrementPoints(points, SkillsManager.PointAssignmentMode.AssignOnlyInSandbox);
+			int currentTier = skill.GetCurrentTierNumber();
+			if (prevTier != currentTier)
+			{
+				GameManager.GetSkillNotify().MaybeShowLevelUp(skill.m_SkillIcon, skill.m_DisplayName, skillsManager.GetTierName(currentTier), currentTier + 1);
+			}
+			else
+			{
+				GameManager.GetSkillNotify().MaybeShowPointIncrease(skill.m_SkillIcon);
+			}
+
+			Instance.LoggerInstance?.Msg($"{skillName} | T{prevTier} ({prevPoints}+{points}) -> T{currentTier+1} ({skill.GetPoints()})");
+		}
 
 		/// <summary>
 		/// Register a new custom skill.
@@ -116,7 +121,7 @@ namespace FiligranisSkills
         {
 			if (IsRegistered(def.Name))
 			{
-				MelonLogger.Error($"Some mod is trying to regsiter a skill {def.Name} which the name is already used, it won't be registered, please report to the mod authors.");
+				FiligranisSkills.Instance.LoggerInstance?.Error($"Some mod is trying to regsiter a skill {def.Name} which the name is already used, it won't be registered, please report to the mod authors.");
 				return;
 			}
 			defs.Add(def);
@@ -132,8 +137,8 @@ namespace FiligranisSkills
 			for (int i = 0; i < skillsMgr.m_Skills.Count; i++)
 			{
                 Skill skill = skillsMgr.m_Skills[i];
-                FiligranisSkills.Instance.Logger?.Msg($"#{i} Skill: {skill?.name}");
-					FiligranisSkills.Instance.Logger?.Error($"RefreshSelectedSkillDescriptionView: {skill.name} ({skill.GetPoints()}p) (t{skill.GetCurrentTierNumber()})... { skill.GetTierPoints(0) }/{ skill.GetTierPoints(1) }/{ skill.GetTierPoints(2) }/{ skill.GetTierPoints(3) }/{ skill.GetTierPoints(4) }");
+                // FiligranisSkills.Instance.LoggerInstance?.Msg($"#{i} Skill: {skill?.name}");
+				// FiligranisSkills.Instance.LoggerInstance?.Error($"RefreshSelectedSkillDescriptionView: {skill.name} ({skill.GetPoints()}p) (t{skill.GetCurrentTierNumber()})... { skill.GetTierPoints(0) }/{ skill.GetTierPoints(1) }/{ skill.GetTierPoints(2) }/{ skill.GetTierPoints(3) }/{ skill.GetTierPoints(4) }");
 				// if (skill is CustomSkill cs)
 				// {
 				// 	FiligranisSkills.Instance.Logger?.Msg($"CustomSkill {cs.Def.Name} {cs.Def.TierThresholds[0]}/{cs.Def.TierThresholds[1]}/{cs.Def.TierThresholds[2]}/{cs.Def.TierThresholds[3]}/{cs.Def.TierThresholds[4]}");
@@ -143,22 +148,21 @@ namespace FiligranisSkills
 			{
                 SkillListItem skillListItem = __instance.m_SkillsDisplayList[__instance.m_SkillListSelectedIndex];
                 var skill = skillListItem.m_Skill;
-				FiligranisSkills.Instance.Logger?.Msg($"RefreshSelectedSkillDescriptionView - replacing image for: {skill?.name}");
+				// FiligranisSkills.Instance.LoggerInstance?.Msg($"RefreshSelectedSkillDescriptionView - replacing image for: {skill?.name}");
 				if (skill == null) return;
 				var sName = skill.name.Substring("Skill_".Length);
-				FiligranisSkills.Instance.Logger?.Error($"RefreshSelectedSkillDescriptionView: {skill.name} ({skill.GetPoints()}p) (t{skill.GetCurrentTierNumber()})... { skill.GetTierPoints(0) }/{ skill.GetTierPoints(1) }/{ skill.GetTierPoints(2) }/{ skill.GetTierPoints(3) }/{ skill.GetTierPoints(4) }");
+				// FiligranisSkills.Instance.LoggerInstance?.Error($"RefreshSelectedSkillDescriptionView: {skill.name} ({skill.GetPoints()}p) (t{skill.GetCurrentTierNumber()})... { skill.GetTierPoints(0) }/{ skill.GetTierPoints(1) }/{ skill.GetTierPoints(2) }/{ skill.GetTierPoints(3) }/{ skill.GetTierPoints(4) }");
                 Texture2D? image = FiligranisSkills.defs[FiligranisSkills.skills[sName]].Image;
                 if (image != null) __instance.m_SkillImageLarge.mainTexture = image;
 			}
 		}
 	}
 	
-    [HarmonyPatch(nameof(SkillsManager), "Awake")]
+    [HarmonyPatch(typeof(SkillsManager), "Awake")]
 	public static class SkillsManagerInitialize
 	{
 		public static void Postfix(SkillsManager __instance)
 		{
-			FiligranisSkills.Instance.Logger?.Msg($"FSkill: SkillsManager.Awake---");
 			FiligranisSkills.skills.Clear();
 			for (int i = 0; i < FiligranisSkills.defs.Count; i++)
 			{
@@ -177,18 +181,17 @@ namespace FiligranisSkills
 
 				FiligranisSkills.skills[def.Name] = i;
 				__instance.m_Skills.Add(skill);
-				FiligranisSkills.Instance.Logger?.Msg($"Registered CustomSkill#{__instance.m_Skills.Count - 1}: {def.Name} {def.TierThresholds[0]}/{def.TierThresholds[1]}/{def.TierThresholds[2]}/{def.TierThresholds[3]}/{def.TierThresholds[4]}");
+				// FiligranisSkills.Instance.LoggerInstance?.Msg($"Registered CustomSkill#{__instance.m_Skills.Count - 1}: {def.Name} {def.TierThresholds[0]}/{def.TierThresholds[1]}/{def.TierThresholds[2]}/{def.TierThresholds[3]}/{def.TierThresholds[4]}");
 			}
 		}
 	}
 
-    [HarmonyPatch(nameof(SaveGameSystem), nameof(SaveGameSystem.RestoreGlobalData))]
+    [HarmonyPatch(typeof(SaveGameSystem), nameof(SaveGameSystem.RestoreGlobalData))]
 	internal static class RestoreGlobalData
 	{
-    	[HarmonyPriority(Priority.High)]
+    	[HarmonyPriority(Priority.VeryHigh)]
 		internal static void Postfix (string name)
 		{
-			FiligranisSkills.Instance.Logger?.Msg($"FSkill: SaveGameSystem.RestoreGlobalData---");
 			SkillsManager skillsMgr = GameManager.GetSkillsManager();
 			for (int i = FiligranisSkills.customSkillOffset; i < skillsMgr.m_Skills.Count; i++)
 			{
@@ -205,36 +208,31 @@ namespace FiligranisSkills
 			for (int i = 0; i < skillsMgr.m_Skills.Count; i++)
 			{
                 Skill skill = skillsMgr.m_Skills[i];
-                FiligranisSkills.Instance.Logger?.Msg($"#{i} Skill: {skill?.name}");
-				FiligranisSkills.Instance.Logger?.Error($"IncreaseCustomSkillPoints: {skill.name} ({skill.GetPoints()}p) (t{skill.GetCurrentTierNumber()})... { skill.GetTierPoints(0) }/{ skill.GetTierPoints(1) }/{ skill.GetTierPoints(2) }/{ skill.GetTierPoints(3) }/{ skill.GetTierPoints(4) }");
+                // FiligranisSkills.Instance.LoggerInstance?.Msg($"#{i} Skill: {skill?.name}");
+				// FiligranisSkills.Instance.LoggerInstance?.Error($"RestoreGlobalData: {skill.name} ({skill.GetPoints()}p) (t{skill.GetCurrentTierNumber()})... { skill.GetTierPoints(0) }/{ skill.GetTierPoints(1) }/{ skill.GetTierPoints(2) }/{ skill.GetTierPoints(3) }/{ skill.GetTierPoints(4) }");
 				// if (skill is CustomSkill cs) FiligranisSkills.Instance.Logger?.Msg($"CustomSkill {cs.Def.Name} {cs.Def.TierThresholds[0]}/{cs.Def.TierThresholds[1]}/{cs.Def.TierThresholds[2]}/{cs.Def.TierThresholds[3]}/{cs.Def.TierThresholds[4]}");
 			}
 		}
 	}
 
-    [HarmonyPatch(nameof(SaveGameSystem), nameof(SaveGameSystem.SaveGlobalData))]
+    [HarmonyPatch(typeof(SaveGameSystem), nameof(SaveGameSystem.SaveGlobalData))]
 	internal static class SaveGlobalData
 	{
-    	[HarmonyPriority(Priority.High)]
+    	[HarmonyPriority(Priority.VeryHigh)]
 		internal static void Postfix (SlotData slot)
 		{
 			SkillsManager skillsMgr = GameManager.GetSkillsManager();
-			FiligranisSkills.Instance.Logger?.Msg($"FSkill: SaveGameSystem.SaveGlobalData--- ({skillsMgr.m_Skills.Count} skills)");
 			for (int i = FiligranisSkills.customSkillOffset; i < skillsMgr.m_Skills.Count; i++)
 			{
 				var skill = skillsMgr.m_Skills[i];
 				var name = skill.name.Substring("Skill_".Length);
-				FiligranisSkills.Instance.Logger?.Msg($"FSkill: Saving skill#{i} {name} {skill.GetPoints()}p");
+				FiligranisSkills.Instance.LoggerInstance?.Msg($"FSkill: Saving skill#{i} {name} {skill.GetPoints()}p");
 				FiligranisSkills.Instance.ModSave.Save(skill.GetPoints().ToString(), $"skillpoint_{name}");
-				// // Set the tier points again because somehow the array's fucked up and points to somewher else every now and then
-				// for (int j = 0; j < skill.Def.TierThresholds.Length; j++) skill.m_TierPoints[j] = skill.Def.TierThresholds[j];
-				FiligranisSkills.Instance.Logger?.Error($"CustomSkill: {skill.name} ({skill.GetPoints()}p) (t{skill.GetCurrentTierNumber()})... { skill.GetTierPoints(0) }/{ skill.GetTierPoints(1) }/{ skill.GetTierPoints(2) }/{ skill.GetTierPoints(3) }/{ skill.GetTierPoints(4) }");
-				// if (skill is CustomSkill cs) FiligranisSkills.Instance.Logger?.Msg($"CustomSkill Def {cs.Def.Name} {cs.Def.TierThresholds[0]}/{cs.Def.TierThresholds[1]}/{cs.Def.TierThresholds[2]}/{cs.Def.TierThresholds[3]}/{cs.Def.TierThresholds[4]}");
 			}
 		}
 	}
 
-    [HarmonyPatch(nameof(GameManager), nameof(GameManager.HandlePlayerDeath))] // ModData workaround
+    [HarmonyPatch(typeof(GameManager), nameof(GameManager.HandlePlayerDeath))] // ModData workaround
 	internal static class HandlePlayerDeath
 	{
 		internal static void Postfix ()
@@ -249,19 +247,31 @@ namespace FiligranisSkills
 		}
 	}
 
-	public class ReadOnlySkillHandle
+	public readonly record struct ReadOnlySkillHandle (Skill Skill)
 	{
-		Skill skill;
-		public int Tier => skill.GetCurrentTierNumber();
-		public int Points => skill.GetPoints();
+		public int Tier => Skill.GetCurrentTierNumber();
+		public int Points => Skill.GetPoints();
 	}
 
 
     public class SkillDefinition
     {
-		/// <summary>
-		/// Suggestion: use a qualified name to prevent conflicts, for exmaple: [modname.skill]
-		/// </summary>
+        public SkillDefinition(string name = null, LocalizedString displayNameLocalized = null, string iconId = null, string iconBackgroundId = null, string imageId = null, LocalizedString[] tiersDescriptionLocalized = null, LocalizedString[] tiersBenefitsLocalized = null, int[] tierThresholds = null, Texture2D? image = null)
+        {
+            Name = name;
+            DisplayNameLocalized = displayNameLocalized;
+            IconId = iconId;
+            IconBackgroundId = iconBackgroundId;
+            ImageId = imageId;
+            TiersDescriptionLocalized = tiersDescriptionLocalized;
+            TiersBenefitsLocalized = tiersBenefitsLocalized;
+            TierThresholds = tierThresholds;
+            Image = image;
+        }
+
+        /// <summary>
+        /// Suggestion: use a qualified name to prevent conflicts, for exmaple: [modname.skill]
+        /// </summary>
         public string Name { get; set; }
 
         public LocalizedString DisplayNameLocalized { get; set; }
