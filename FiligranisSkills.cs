@@ -16,22 +16,29 @@ namespace FiligranisSkills
         public override void OnEarlyInitializeMelon()
         {
 			Instance = this;
-			
-			customSkillOffset = -1;
-			foreach (var st in Enum.GetValues<SkillType>())
-			if ((int) st > customSkillOffset) customSkillOffset = (int) st;
         }
 
         public override void OnInitializeMelon()
         {
-			uConsole.RegisterCommand("fskills_saved", new Action(() => {
-				for (int i = FiligranisSkills.customSkillOffset; i < GameManager.GetSkillsManager().m_Skills.Count; i++)
-				{
-					var skill = GameManager.GetSkillsManager().m_Skills[i];
-					var name = skill.name.Substring("Skill_".Length);
-					Instance.LoggerInstance?.Msg($"FSkill: {name} {Instance.ModSave.Load($"skillpoint_{name}")}");
-				}
-			}));
+            uConsole.RegisterCommand("fskills_saved", new Action(() =>
+            {
+                for (int i = FiligranisSkills.customSkillOffset; i < GameManager.GetSkillsManager().m_Skills.Count; i++)
+                {
+                    var skill = GameManager.GetSkillsManager().m_Skills[i];
+                    var name = skill.name.Substring("Skill_".Length);
+                    Instance.LoggerInstance?.Msg($"FSkill: {name} {Instance.ModSave.Load($"skillpoint_{name}")}");
+                }
+            }));
+            uConsole.RegisterCommand("fskills_list", new Action(() =>
+            {
+                var skills = GameManager.GetSkillsManager().m_Skills;
+                for (int i = 0; i < skills.Count; i++)
+                {
+                    var skill = skills[i];
+                    var name = skill.name.Substring("Skill_".Length);
+                    Instance.LoggerInstance?.Msg($"- {name}");
+                }
+            }));
 			uConsole.RegisterCommand("fskills_add_point", new Action(() => {
 				var @params = uConsole.GetAllParameters();
 				if (@params == null) return;
@@ -164,6 +171,9 @@ namespace FiligranisSkills
 		public static void Postfix(SkillsManager __instance)
 		{
 			FiligranisSkills.skills.Clear();
+			// FiligranisSkills.Instance.LoggerInstance?.Msg($"Before registering custom skills... {FiligranisSkills.customSkillOffset} -> {__instance.m_Skills.Count}");
+			FiligranisSkills.customSkillOffset = __instance.m_Skills.Count;
+
 			for (int i = 0; i < FiligranisSkills.defs.Count; i++)
 			{
 				var def = FiligranisSkills.defs[i];
